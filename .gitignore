@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test / runtime JSON artifacts (P2 修复：不再用 *.json 一刀切，避免误吞 package.json)
+reject_pool*.json
+*_reject_pool.json
+*_candidate.json
+*_audit_results*.json
+harness_*.json
+backups/
+*.corrupt
+
+# Audit results
+_audit_results*.json
+v*_audit_results.json
+
+# Temporary files
+*.tmp
+*.log
+/tmp/
+/temp/
