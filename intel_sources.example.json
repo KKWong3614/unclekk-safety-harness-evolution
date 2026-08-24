@@ -1,0 +1,25 @@
+{
+  "sources": [
+    {
+      "type": "security_check_rules",
+      "path": "~/.workbuddy/skills/skills-security-check/SKILL.md",
+      "priority": "P0",
+      "note": "从 skills-security-check 提取已知攻击话术模板 → rule_bank"
+    },
+    {
+      "type": "allowed_tools",
+      "path": "~/.workbuddy/skills/monitor-panel/SKILL.md",
+      "note": "从 skill frontmatter 提取 allowed_tools → tool_policy"
+    },
+    {
+      "type": "cross_agent_memory",
+      "path": "~/.cross-agent-memory/memory.jsonl",
+      "note": "跨 Agent 共享记忆 JSONL 经验 → safety_memory（路径按实际部署调整）"
+    },
+    {
+      "type": "shared_intel",
+      "path": "shared_intel.json",
+      "note": "其他 Agent 用 sync_artifacts.py push 导出的共享情报"
+    }
+  ]
+}
