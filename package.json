@@ -1,0 +1,33 @@
+{
+  "name": "unclekk-safety-harness-evolution",
+  "version": "1.1.13",
+  "description": "Self-Evolving Safety Harness (SHE) for Multi-Agent Systems",
+  "main": "scripts/evolve_guard.py",
+  "scripts": {
+    "test": "python scripts/test_p0_regression.py",
+    "lint": "flake8 scripts/ --count --select=E9,F63,F7,F82 --show-source --statistics"
+  },
+  "keywords": [
+    "safety",
+    "harness",
+    "agent",
+    "security",
+    "multi-agent",
+    "evolution",
+    "self-healing"
+  ],
+  "author": "unclekk",
+  "license": "MIT",
+  "dependencies": {
+    "pyyaml": "^6.0.1"
+  },
+  "devDependencies": {
+    "pytest": "^8.0.0",
+    "flake8": "^7.0.0"
+  },
+  "python": ">=3.11",
+  "url": {
+    "repository": "https://github.com/unclekk/safety-harness-evolution",
+    "issues": "https://github.com/unclekk/safety-harness-evolution/issues"
+  }
+}
