@@ -8,7 +8,7 @@ from setuptools import setup
 
 setup(
     name="unclekk-safety-harness-evolution",
-    version="1.1.13",
+    version="1.1.14",
     description="Self-Evolving Safety Harness (SHE) for Multi-Agent Systems",
     long_description=(
         "Self-evolving Safety Harness workflow for multi-agent systems. When agents "
