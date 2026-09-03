@@ -1,6 +1,6 @@
 {
   "name": "unclekk-safety-harness-evolution",
-  "version": "1.1.13",
+  "version": "1.1.15",
   "description": "Self-Evolving Safety Harness (SHE) for Multi-Agent Systems",
   "main": "scripts/evolve_guard.py",
   "scripts": {
