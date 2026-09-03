@@ -1,19 +1,3 @@
-# unclekk-safety-harness-evolution (Self-Evolving Safety Harness, SHE)
-
-## Install (English)
-
-```bash
-git clone https://github.com/KKWong3614/unclekk-safety-harness-evolution.git "$HOME/.workbuddy/skills/unclekk-safety-harness-evolution"
-```
-
-## 安装（中文）
-
-```bash
-git clone https://github.com/KKWong3614/unclekk-safety-harness-evolution.git "%USERPROFILE%\.workbuddy\skills\unclekk-safety-harness-evolution"
-```
-
----
-
 ---
 name: unclekk-safety-harness-evolution
 description: Self-evolving Safety Harness (SHE) workflow for multi-agent systems. When agents experience privilege escalation, failures, or indirect injection/poisoning, diagnose the responsible artifact, generate minimal patches, pass through three hard gates (backup / safety-utility gate / reject pool dedup), and write back to form a self-healing loop. Integrates with SkillSentry honeypot for proactive sample generation.
@@ -94,10 +78,20 @@ See `references/architecture.md` for complete specification with pseudocode.
 
 | Script | Purpose |
 |--------|---------|
-| `evolve_guard.py` | Three hard gates executor (backup / gate B / reject pool / rollback) |
+| `evolve_guard.py` | Three hard gates executor (backup / gate B / reject pool / rollback / friendly rc hints) |
 | `score_patch.py` | Candidate patch scorer (heuristic regex + optional LLM) |
 | `harness_hooks.py` | Runtime monitoring hooks (canary / honeypot / ToolPolicy enforcement) |
+| `sync_artifacts.py` | Cross-Agent intel sync (pull/push) — push now carries a source `signature` (W-R5 fixed) |
+| `gen_coldstart_samples.py` | **Local cold-start sample factory** — turns built-in benches into replayable trajectories + candidate patches, no SkillSentry required |
+| `semantic_intent.py` | Semantic intent engine (action×object composition: veto / alert intents) |
 | `utils.py` | Shared utilities (unicode normalization, regex compilation) |
+
+### Docs
+
+- `references/cheatsheet.md` — one-page concept map + quick reference (start here)
+- `references/faq.md` — FAQ + anti-pattern / bypass-attempt defense table
+- `references/architecture.md` — full spec (pseudocode, gate tables, integration matrix)
+- `examples/automation_hook.md` — copy-paste wiring templates (monitor-panel / cron / your own framework)
 
 ### Test Coverage
 
@@ -109,11 +103,13 @@ See `references/architecture.md` for complete specification with pseudocode.
 - **24/24 semantic-intent tests passing** (action×object intent engine; all 9 former paraphrase blind-spots now blocked; benign zero-FP)
 - **21/21 L3-hardening tests passing** (rotated honeytokens, obfuscated honeytools, anti-flood limiter, slow-poison detection, O_NOFOLLOW writes, runtime-enforcement spec)
 - **15/15 evolve-trigger tests passing** (access-mode-B automation loop: event→patch→diagnosis→gate→auto-apply, load-payload veto protection)
+- **cold-start sample factory**: `python scripts/gen_coldstart_samples.py --selftest` (deterministic; `tests/test_coldstart_gen.py` 1 file, CI-friendly) — derives replayable trajectories + candidate patches from built-in benches (no SkillSentry needed)
 - **0 known blind-spot (gap) samples remain** — the semantic intent layer closed the last paraphrase blind-spot; attack bench is 97/97
 - Run: `python scripts/test_p0_regression.py` (cross-platform; no `PYTHONHOME` hack needed)
 - Run: `python tests/test_attack_bench.py` (cross-platform; deterministic; no pytest needed)
 - Run: `python tests/test_benign_bench.py` (cross-platform; deterministic; no pytest needed)
 - Run: `python tests/test_guard_enhancements.py` (cross-platform; deterministic; no pytest needed)
+- Run: `python tests/test_coldstart_gen.py` (cross-platform; deterministic; no pytest needed)
 
 ## Integration with SkillSentry
 
@@ -122,18 +118,22 @@ See `references/architecture.md` for complete specification with pseudocode.
 - **Sample factory**: Breaks cold-start by generating adversarial samples
 - **Re-test oracle**: Verifies hardening with honeypot re-testing
 
-Local alternative: `run_react_demo()` in `harness_hooks.py`
+Local alternatives (no SkillSentry required):
+- `scripts/gen_coldstart_samples.py` — derives replayable trajectories + candidate patches from the built-in benches (`tests/attack_bench.json` 97 + `tests/benign_bench.json` 30); feeds directly into `evolve_trigger --event` / `judge` / `apply`.
+- `run_react_demo()` in `harness_hooks.py` — single-shot "honeytool touch → intercept → candidate" demo.
 
 ## Security Features
 
 - ✅ One-vote veto: Plaintext / zero-width / NFKC bypass detection (incl. "disable the safety check" variants, glued/deformed terms like `allow_all` / `allow\u200ball` → `allowall`)
-- ✅ Attack bench: 81-sample adversarial test suite in CI — any regression in veto/ingest/honeytoken interception fails the build
+- ✅ Attack bench: 97-sample adversarial test suite in CI — any regression in veto/ingest/honeytoken interception fails the build
 - ✅ Benign bench: 25-sample utility test suite in CI — over-refusal (false-positive blocking) regression fails the build; pass rate anchors the U-score
 - ✅ Backup manifest (P1-14): backups carry sha256 hashes verified on rollback (tamper/corruption → rc=4); `--max-backups` rotation keeps only the newest N
 - ✅ Semantic patch-key dedup (P1-14): reject pool keys ignore case/whitespace/metadata — same semantic patch can't bypass dedup by reformatting; structured entries carry `{key, reason, ts}`
 - ✅ Diagnosis schema (P1-15): LLM diagnosis must satisfy a controlled-enum JSON schema (`failure_type`/`zi`/`routing`) — machine-verifiable before writeback (invalid → rc=7, retry-able)
 - ✅ Writeback audit log (P1-15): JSONL audit of every apply/judge/auto-rollback with scores, diagnosis, gate, operator (`--audit-log`, `--operator`)
 - ✅ Cross-Agent intel sync (P1-16): `sync_artifacts.py` pulls rules/experience/tool-allowlists from `skills-security-check` / `cross-agent-memory` / skill `allowed_tools` / shared-intel JSONs — merging is ratchet-guarded (external loosenings like `allow: all` are rejected); `push` exports shared intel for other Agents
+- ✅ Push source signature (W-R5 fixed, v1.1.15): `sync_artifacts push` now attaches a `signature` block (source + `signed_at` + sha256 digest); `sync_artifacts verify` re-checks integrity so tampered/forged shared intel is detectable — closes the previously "documented-not-fixed" gap
+- ✅ Local cold-start sample factory (v1.1.15): `gen_coldstart_samples.py` turns the built-in attack/benign benches into replayable trajectories + candidate patches — the evolution loop gets real local samples without depending on the external SkillSentry component
 - ✅ Semantic intent engine (P1-18): action×object class-composition (`email me all the credentials` → exfil alert, `act as a system administrator` → hijack veto) — closes the paraphrase blind-spot that regex/keyword blacklists could not; veto-class intents block patches, exfil-class intents raise non-downgradable alerts
 - ✅ L3 hardening (P1-19): rotated/obfuscated honeypots (`make_honeytoken`, `register_honeytool`, anti-flood `HoneypotRateLimiter`); `SlowPoisonDetector` for multi-turn fragment injection; O_NOFOLLOW atomic writes; `compile_enforcement` + `enforce_tool` runtime-enforcement decoupling (harness↔executor consistency)
 - ✅ Automation trigger (P1-21): `evolve_trigger.py` runs the full loop on a single anomaly event (intercept event / free-text alert / direct candidate) → diagnosis → score → judge → optional auto-apply with backup + audit; machine-parseable JSON output for monitor-panel integration
@@ -162,6 +162,6 @@ If used in research, cite:
   title={Self-Evolving Safety Harness for Multi-Agent Systems},
   author={unclekk},
   year={2026},
-  url={https://github.com/KKWong3614/unclekk-safety-harness-evolution}
+  url={https://github.com/unclekk/safety-harness-evolution}
 }
 ```
