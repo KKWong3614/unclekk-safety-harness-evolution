@@ -27,6 +27,7 @@
 """
 import argparse
 import copy
+import hashlib
 import json
 import os
 import re
@@ -308,13 +309,50 @@ def cmd_push(args):
             "tool_policy": _clean(art.get("tool_policy") if isinstance(art.get("tool_policy"), list) else []),
         },
     }
+    # W-R5 修复：导出时附加来源签名（source + signed_at + sha256 摘要），
+    # 供 pull 方溯源与篡改检测；不含密钥，仅针对导出内容的确定性摘要。
+    out["signature"] = _sign_intel(out["artifacts"], out["source_harness"], out["exported_at"])
     os.makedirs(os.path.dirname(os.path.abspath(args.out)) or ".", exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
+    if getattr(args, "check", False):
+        ok = _verify_intel_file(args.out)
+        print(f"[sync] 签名自检：{'通过' if ok else '失败'}（{out['signature']['signature'][:12]}…）")
     print(f"[sync] 已导出共享情报：{args.out}（rule_bank {len(out['artifacts']['rule_bank'])} / "
           f"safety_memory {len(out['artifacts']['safety_memory'])} / "
           f"tool_policy {len(out['artifacts']['tool_policy'])}）")
     return 0
+
+
+def _sign_intel(artifacts, source_harness, exported_at):
+    """对导出工件做确定性 sha256 摘要签名（无密钥，仅溯源/篡改检测用）。"""
+    canon = json.dumps(artifacts, ensure_ascii=False, sort_keys=True)
+    digest = hashlib.sha256((canon + "|" + source_harness + "|" + str(exported_at)).encode("utf-8")).hexdigest()
+    return {"source": os.path.abspath(source_harness), "signed_at": exported_at,
+            "algo": "sha256", "signature": digest}
+
+
+def _verify_intel_file(path):
+    """重算导出文件签名，与文件内 signature 比较；缺字段返回 False。"""
+    try:
+        data = _load_json(path)
+    except (json.JSONDecodeError, OSError):
+        return False
+    sig = data.get("signature") if isinstance(data, dict) else None
+    art = data.get("artifacts") if isinstance(data, dict) else None
+    if not isinstance(sig, dict) or not isinstance(art, dict) or "signature" not in sig:
+        return False
+    expected = _sign_intel(art, sig.get("source", ""), sig.get("signed_at", ""))["signature"]
+    return sig["signature"] == expected
+
+
+def cmd_verify(args):
+    ok = _verify_intel_file(args.infile)
+    if ok:
+        print(f"[sync] 签名校验通过：{args.infile}（内容未被篡改）")
+        return 0
+    print(f"[sync] 签名校验失败：{args.infile}（内容被篡改或缺少签名）", file=sys.stderr)
+    return 1
 
 
 def main():
@@ -333,10 +371,15 @@ def main():
     ps = sub.add_parser("push", help="导出护栏工件为共享情报 JSON")
     ps.add_argument("--harness", required=True, help="护栏文件（json/yaml）")
     ps.add_argument("--out", required=True, help="共享情报输出路径")
+    ps.add_argument("--check", action="store_true", help="写盘后重算签名自检（W-R5 源签名）")
     ps.set_defaults(func=cmd_push)
 
+    pv = sub.add_parser("verify", help="校验已导出共享情报的源签名完整性")
+    pv.add_argument("--in", dest="infile", required=True, help="共享情报 JSON 路径")
+    pv.set_defaults(func=cmd_verify)
+
     args = p.parse_args()
-    if getattr(args, "backup_dir", None) is None:
+    if getattr(args, "backup_dir", None) is None and getattr(args, "harness", None):
         args.backup_dir = os.path.join(os.path.dirname(os.path.abspath(args.harness)), "backups")
     return args.func(args)
 
