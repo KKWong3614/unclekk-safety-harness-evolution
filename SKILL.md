@@ -1,14 +1,13 @@
 ---
-name: unclekk-safety-harness-evolution
 slug: unclekk-safety-harness-evolution
-displayName: 自进化安全护栏（SHE） | Self-Evolving Safety Harness (SHE)
-version: 1.1.13
+name: unclekk-safety-harness-evolution
+displayName: UncleKK SHE 自进化安全护栏
+version: 1.1.15
 summary: >-
   把 Agent 安全护栏拆成四工件（系统提示 / 规则库 / 安全记忆 / 工具策略），按失败轨迹做归因诊断、生成最小补丁、过三道硬闸写回，形成 测→诊→改→验 的自愈闭环。 | Split an Agent's safety harness into four artifacts (system prompt / rule bank / safety memory / tool policy); perform attribution diagnosis from failure traces, generate minimal patches, and write them back through three hard gates, forming a measure→diagnose→fix→verify self-healing loop.
 description: >-
   自进化安全护栏（SHE）工作流。当用户的多 Agent 系统在运行中出现越权、失败、被间接注入/投毒的案例，或希望把 SkillSentry 蜜罐测出的风险硬化进护栏时使用。把 Agent 的安全约束拆成四工件（系统提示 / 规则库 / 安全记忆 / 工具策略），按失败轨迹做归因诊断、生成最小补丁、经三道硬闸（先备份 / 安全-效用闸门 / 拒收池去重）后写回，形成 测→诊→改→验 的自愈闭环。适用于 Agent 安全加固、护栏自进化、蜜罐联动硬化、多 Agent 失守复盘。 | Self-Evolving Safety Harness (SHE) workflow. Use when a multi-Agent system shows privilege escalation, failures, or indirect injection/poisoning, or when you want to harden honeypot-found risks into the harness. Splits an Agent's safety constraints into four artifacts (system prompt / rule bank / safety memory / tool policy), diagnoses root causes from failure traces, generates minimal patches, and writes them back through three hard gates (backup / safety-utility gate / reject-pool dedup), forming a measure→diagnose→fix→verify self-healing loop. For Agent hardening, harness self-evolution, honeypot-linked hardening, and multi-Agent failure post-mortems.
 license: MIT
-author: unclekk
 ---
 
 # unclekk-safety-harness-evolution（自进化安全护栏）
@@ -120,11 +119,18 @@ SHE 无失败样本则进化环不转。SkillSentry（Adaptive Honeypot Worlds�
 
 SHE cannot turn its evolution loop without failure samples. SkillSentry (Adaptive Honeypot Worlds) uses "adaptive honeypot worlds + controlled bait resources + behavioral attribution (enabled vs. skill-disabled execution comparison)" to probe boundaries dynamically before a skill is attached, hitting 99.50% Recall / 96.26% F1. It plays two roles: ① sample factory — breaks cold start by actively generating adversarial samples to feed the loop; ② re-test oracle — after hardening, re-test with the honeypot to confirm the fix works.
 
-### 本地替代方案：run_react_demo | Local Alternative: run_react_demo
+### 本地替代方案：不依赖 SkillSentry 的冷启动 | Local Alternatives (No SkillSentry Needed)
 
-本 skill 提供 `run_react_demo()` 作为本地模拟方案，展示「honeytool 触碰 → 拦截 → 自动产 candidate」流程，可用于测试和演示。
+> 测评反馈：此前冷启动只靠 `run_react_demo()` 单次模拟，缺「可回放样本源」。现已补齐：
 
-This skill provides `run_react_demo()` as a local simulation that demonstrates the "honeytool touch → intercept → auto-generate candidate" flow, usable for testing and demos.
+1. **本地样本工厂（推荐）`scripts/gen_coldstart_samples.py`**：把内置对抗/良性基准（`tests/attack_bench.json` 97 条 + `tests/benign_bench.json` 30 条）转成**可回放轨迹 + 收敛后的候选补丁 + 效用 sanity 提示**，纯标准库、离线、确定性。输出喂给 `evolve_trigger --event` / `judge` / `apply` 即可跑完整环，无需 SkillSentry：
+   ```bash
+   python scripts/gen_coldstart_samples.py --out coldstart_samples
+   # → attack_trajectories.jsonl / attack_candidates.jsonl / benign_prompts.jsonl / summary.json
+   ```
+2. **自研 ReAct demo `run_react_demo()`**：展示「honeytool 触碰 → 拦截 → 自动产 candidate」单次流程，适合概念演示。
+
+This skill provides both a **local sample factory** (`gen_coldstart_samples.py`, derives replayable trajectories + candidate patches from the built-in benches) and a `run_react_demo()` simulation — neither requires SkillSentry.
 
 ## Rule Bank 首攻策略（推荐切入点） | Rule Bank First-Strike Strategy (Recommended Entry Point)
 
@@ -135,7 +141,7 @@ Smallest change, fastest payoff. Reasons: finest granularity (each rule independ
 ## 接入方式 | Integration Modes
 
 - **A 手动触发 Manual trigger**：用户提供失败轨迹文件 → 调用本 skill → 输出诊断报告 + 补丁建议
-- **B 自动化钩子（推荐）Automated hook (recommended)**：monitor-panel 检测到越权/异常 → 触发本 skill → 诊断+补丁+验证 → 过三闸后写回 → 回报。✅ **已代码化**：`scripts/evolve_trigger.py` 一键跑完整进化环（事件→补丁→diagnosis→评分→judge→[auto-apply]→审计），输出结构化 JSON 供调用方解析；`--auto-apply` 显式传才写回（人工旁路原则），`--dry-run` 只预览，事件支持拦截事件/自由文本/直接 candidate 三形态。**monitor-panel 联动已落地**：`monitor-panel` skill 内置「安全护栏联动」章节（反复自愈失败/越权迹象/安全事件上报 → 按其中命令触发；dry-run 预览 → `--auto-apply` 写回；事件三形态模板齐备）
+- **B 自动化钩子（推荐）Automated hook (recommended)**：monitor-panel 检测到越权/异常 → 触发本 skill → 诊断+补丁+验证 → 过三闸后写回 → 回报。✅ **已代码化**：`scripts/evolve_trigger.py` 一键跑完整进化环（事件→补丁→diagnosis→评分→judge→[auto-apply]→审计），输出结构化 JSON 供调用方解析；`--auto-apply` 显式传才写回（人工旁路原则），`--dry-run` 只预览，事件支持拦截事件/自由文本/直接 candidate 三形态。**monitor-panel 联动已落地**：`monitor-panel` skill 内置「安全护栏联动」章节（反复自愈失败/越权迹象/安全事件上报 → 按其中命令触发；dry-run 预览 → `--auto-apply` 写回；事件三形态模板齐备）。**接线模板见 `examples/automation_hook.md`**（命令行 / monitor-panel / 定时任务 / 自框架挂载四种形态可直接照抄）。
 - **C 蜜罐联动闭环 Honeypot closed loop**：SkillSentry 测出风险 → 产出对抗样本 → 喂本 skill → 进化环补丁 → 写回 → 回传 SkillSentry 复测 → 通过闭环 / 未过再跑一轮
 
 ## 自动化闭环（代码硬支持） | Automated Loop (Code-Supported)
@@ -221,11 +227,14 @@ python scripts/evolve_guard.py rollback --backup backups/harness_<时间戳>.jso
 - `scripts/score_patch.py`：候选补丁评分器（启发式正则打分，可选接小模型），输出 S/U 分供 judge 使用
 - `scripts/harness_hooks.py`：运行时监控切面（canary / 蜜罐 / ToolPolicy 拦截 + RingBus + 命中自动落成 candidate），含自研 ReAct demo 与 LangGraph 适配接口
 - `scripts/test_p0_regression.py`：P0 修复的端到端回归测试（18 用例，跨进程并发验证，可复跑）
-- `scripts/sync_artifacts.py`：跨 Agent 威胁情报同步 / 与 KK 现有资产接线（P1-16）——`pull` 从 skills-security-check / cross-agent-memory / allowed_tools / shared_intel 拉取工件合入 harness（棘轮只增不减、写回前备份、`--dry-run` 预览）；`push` 导出共享情报 JSON。示例配置 `intel_sources.example.json`
+- `scripts/sync_artifacts.py`：跨 Agent 威胁情报同步 / 与 KK 现有资产接线（P1-16）——`pull` 从 skills-security-check / cross-agent-memory / allowed_tools / shared_intel 拉取工件合入 harness（棘轮只增不减、写回前备份、`--dry-run` 预览）；`push` 导出共享情报 JSON（**W-R5 已修复：导出附来源签名 `signature`，`verify` 子命令可校验完整性**）。示例配置 `intel_sources.example.json`
+- `scripts/gen_coldstart_samples.py`：**本地冷启动样本工厂（v1.1.15，回应测评 concern）**——把内置 attack/benign bench 转成可回放轨迹 + 候选补丁 + 效用 sanity 提示，不依赖 SkillSentry；`tests/test_coldstart_gen.py` 配套自检
 - `scripts/semantic_intent.py`：语义意图引擎（P1-18，L3-11 离线版）——动作类×对象类组合触发五类意图（指令覆盖/身份劫持/规则豁免→veto；凭据外泄/数据外泄→alert），封掉正则体系最后的语义等价盲区（attack bench gap 归零，97/97）；纯标准库离线
 - `scripts/utils.py`：共享工具函数（normalize_unicode, normalize_for_scan, compile_regex, format_ts）
 - **L3 纵深（P1-19）**：harness_hooks 新增——`make_honeytoken`（随机+时间轮换蜜罐凭据）/ `register_honeytool`（随机后缀混淆，防工具清单识别）/ `HoneypotRateLimiter`（防 telemetry 灌毒限流）/ `SlowPoisonDetector`（跨轨迹碎片化投毒检测）/ `load_enforcement`+`enforce_tool`（运行时强制决策）；evolve_guard 新增——`_open_write_no_follow`（O_NOFOLLOW 原子写防 symlink 劫持）/ `compile_enforcement`（tool_policy→机器可读 enforcement spec，apply 写回时自动同步，护栏与执行器解耦校验）。`tests/test_l3_hardening.py` 21 用例入 CI
 - `references/architecture.md`：完整规格——四工件映射表、进化环伪码、三闸判定表、SkillSentry 冷启动、Rule Bank schema、集成映射总表、局限风险
+- `references/cheatsheet.md`：**一页纸概念图 + 速查卡**（四工件/三道闸/7 步闭环/常用命令/退出码），初次上手先看这张
+- `references/faq.md`：**FAQ 与反模式集中入口**——高频问答 + 「绕过尝试 vs 护栏如何挡」对照表（测评反馈：此前反模式分散在各段，已统一）
 
 ## TL;DR 速查表 | Quick Reference
 
@@ -236,6 +245,7 @@ python scripts/evolve_guard.py rollback --backup backups/harness_<时间戳>.jso
 | 手动触发 | "诊断这个失败" / "生成补丁" | 用户提供轨迹文件 → 输出诊断报告 |
 | 自动化钩子 | monitor-panel 检测到异常 | 自动触发 → 诊断 → 补丁 → 写回 |
 | 出问题回滚 | "回滚" / "撤销写回" | `rollback --backup <快照> --harness <护栏>` |
+| 想快速上手 | "怎么用" / "概念图" | 先读 `references/cheatsheet.md`（一页纸），常见疑问看 `references/faq.md` |
 
 ## 诊断报告格式模板 | Diagnosis Report Template
 
