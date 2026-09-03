@@ -1289,6 +1289,30 @@ def cmd_rollback(args):
     return 0
 
 
+# ── 退出码友好说明（P1-24：errorHandling 测评反馈「部分错误提示偏技术化」）──────
+# 既有的 stderr 技术日志保留不变；这里在非 0 退出时追加一行「人话」提示，
+# 让用户秒懂 rc 含义与下一步动作。行为/rc 值一律不变。
+_RC_EXPLAIN = {
+    0: ("成功", "无需处理。"),
+    1: ("一般性错误", "查看上方 stderr 的具体报错（如缺失 P0 回归测试文件）。"),
+    2: ("补丁被拒收", "这是预期的安全拦截（格式非法 / 一票否决 / 闸B 未过），已记入拒收池。"
+                      "正常——不是坏结果；想放行需先修正补丁使其收紧且提升安全分。"),
+    3: ("进化中止", "无有效备份（先 `backup` 再 `apply`）或拒收池已达轮次上限；"
+                    "上限情形建议人工审核拒收池内容。"),
+    4: ("路径沙箱 / 回滚拒绝", "路径越界、扩展名非法、或备份损坏/被篡改。检查路径是否落在护栏目录内、"
+                              "扩展名是否为 .json/.yaml/.yml、备份是否完好。"),
+    5: ("无法重跑闸B（fail-closed）", "缺少 score_patch.py，为防绕闸已中止写回。确认 score_patch.py 同在 scripts/ 目录。"),
+    6: ("写回后 P0 回归未过", "护栏未被改弱，已自动回滚到最新备份。检查补丁质量后重试。"),
+    7: ("诊断 schema 非法", "补丁的 diagnosis 元数据不符合受控枚举（这是元数据问题，不进拒收池）。"
+                           "修正 diagnosis 后同一内容可重试。"),
+}
+
+
+def _print_rc_hint(rc: int) -> None:
+    title, action = _RC_EXPLAIN.get(rc, ("未知退出码", "查看上方 stderr 输出。"))
+    print(f"[退出码 {rc}] {title} —— {action}", file=sys.stderr)
+
+
 def main():
     p = argparse.ArgumentParser(description="unclekk-safety-harness-evolution 三道硬闸执行器")
     p.add_argument("--version", action="version", version="%(prog)s 1.1.1")
@@ -1367,7 +1391,10 @@ def main():
                 args.allow_root = candidates[0]
         else:
             args.allow_root = os.path.realpath(".")
-    return args.func(args)
+    rc = args.func(args)
+    if rc:
+        _print_rc_hint(rc)
+    return rc
 
 
 if __name__ == "__main__":
