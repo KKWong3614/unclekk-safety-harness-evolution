@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.15] - 2026-08-27
+
+### Optimization (from SkillHub evaluation report, overall 4.5/5)
+
+- **FAQ + anti-pattern hub (fixes `convention.antiPatternFaq` 4.3 — lowest scored item)**: new `references/faq.md` consolidating common Q&A (cold-start sampling / SkillSentry-optional / ratchet / three-gate formula / rollback / harness format) **and** a "bypass-attempt vs how-the-harness-blocks-it" table (14 patterns). Previously these anti-patterns were scattered across SKILL.md FIXME/边界 notes — now a single entry point.
+- **Automation hook examples (fixes `adaptability.trigger` 4.5)**: new `examples/automation_hook.md` with copy-paste wiring for monitor-panel / cron / your own Agent framework (event three-forms, `--dry-run` → `--auto-apply` flow, stdout-JSON parsing). Referenced from integration mode B.
+- **Friendlier exit codes (fixes `reliability.errorHandling` 4.5)**: `evolve_guard.py` now prints a one-line human-readable hint (`rc → meaning + next action`) on non-zero exit via a new `_RC_EXPLAIN` map; existing rc values and behavior unchanged. `references/cheatsheet.md` adds an exit-code quick table.
+- **Concept cheat sheet (fixes `effectiveness.usability` 4.5)**: new `references/cheatsheet.md` with a one-page ASCII concept map (four artifacts / three gates / 7-step loop / common commands / exit codes) — read this first.
+- **Local cold-start sample factory (addresses evaluation summary concern: SkillSentry is optional/external, cold start relied only on simulation)**: new `scripts/gen_coldstart_samples.py` derives replayable trajectories + candidate patches from the built-in attack/benign benches (no SkillSentry needed); `tests/test_coldstart_gen.py` self-check. Subject categories break down as instruction-override / logic-bypass / rule-exemption / identity-hijack / data-exfil / credential-exfil / honeytoken.
+- **Push source signature (W-R5 "documented-not-fixed" → fixed)**: `sync_artifacts push` now attaches a `signature` block (source + `signed_at` + sha256 digest); new `verify` subcommand re-checks integrity so tampered/forged shared intel is detectable.
+
+### Changed
+- SKILL.md: cold-start section now lists the local factory first; integration mode B links `examples/automation_hook.md`; Resources + TL;DR reference cheatsheet/faq; README: core-scripts table, docs section, test-coverage lines, SkillSentry-integration + security-features updated (attack bench corrected 81→97).
+- Full suite green: **P0 18 / attack 97 / benign 30 / guard-enh 43 / sync 17 / semantic 24 / L3 21 / trigger 15** (265 assertions) + new `tests/test_coldstart_gen.py` self-check.
+
+---
+
 ## [1.1.13] - 2026-08-24
 
 ### Security (second adversarial audit, PoC-verified then fixed)
