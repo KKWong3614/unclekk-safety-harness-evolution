@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SKILL.md: cold-start section now lists the local factory first; integration mode B links `examples/automation_hook.md`; Resources + TL;DR reference cheatsheet/faq; README: core-scripts table, docs section, test-coverage lines, SkillSentry-integration + security-features updated (attack bench corrected 81→97).
 - Full suite green: **P0 18 / attack 97 / benign 30 / guard-enh 43 / sync 17 / semantic 24 / L3 21 / trigger 15** (265 assertions) + new `tests/test_coldstart_gen.py` self-check.
 
+### Documentation (TRACE 5.0 follow-up remediation)
+- **Audience breadth → 5.0**: new `### 团队 / CI 接入方式` subsection under Integration Modes — CI gate / shared intel (`sync_artifacts` push-pull) / monitoring linkage / privilege principle.
+- **Main-doc FAQ → 5.0**: new `## 常见问题 FAQ` section in SKILL.md with 5 inline Q&A (cold-start / exit codes / anti-weakening / shared harness / automation hook) linking to `references/faq.md`.
+- **Doc bloat mitigation**: added `CHANGELOG.md` reference in Resources + a pointer before the Honest Boundary blockquote, directing full P1-xx iteration detail out of the SKILL body.
+
 ---
 
 ## [1.1.13] - 2026-08-24

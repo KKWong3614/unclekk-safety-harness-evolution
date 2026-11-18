@@ -101,6 +101,8 @@ The mechanical parts (backup / gate judgment / reject-pool dedup / rollback mani
 > 三道闸与现有 `skills-security-check` 的 P0/P1/P2 分级 + 可回滚原则天然吻合，做硬化时必须原样保留。
 > The three gates align naturally with the P0/P1/P2 tiers and rollback principle of `skills-security-check`; keep them intact when hardening.
 
+> 📋 **完整迭代记录**：本 skill 的全部 P1-xx 修复与审计明细见 `CHANGELOG.md`（SKILL 正文仅保留审计结论摘要，避免膨胀）。
+
 > ⚠️ **诚实边界（审计状态）| Honest Boundary (Audit Status)**：本 skill 已通过 `unclekk-audit-then-optimize` 独立审计（v5 ≈54/100，4 个 P0）+ 2026-08-23 第三方深度审计（含隔离沙箱实跑 PoC，初始 46/100，安全评级 D）。**初始审计发现的 5 个 P0 已全部修复并通过实跑复测**：① rollback 任意路径写（P0-1）→ 路径沙箱化（--allow-root + 扩展名校验 + 越界拒绝）；② 棘轮只增不减缺失（P0-2）→ tool_policy/rule 偏序校验，掺加安词的 allow:* 放宽补丁现被阻断；③ P0 回归闸门未接入（P0-3）→ apply 写回后强制跑回归，失败自动回滚；④ 白名单降级绕过（P0-4）→ canary/注入命中列为硬 alert 不可降级；⑤ CI 永远失败（P0-5）→ 接入真实 test_p0_regression.py。修复后回归 18/18 PASS。剩余 P1（文档契约、打包、边界）与 P2（死代码等）多为非阻断项，其中一票否决变形/honeytoken 归一化/拒收池 fail-closed 等已一并修复。
 > ⚠️ **Honest Boundary (Audit Status)**: This skill passed an independent `unclekk-audit-then-optimize` audit (v5 ≈54/100, 4 P0s) plus a 2026-08-23 third-party deep audit (isolated sandbox PoC, initial 46/100, security grade D). **All 5 P0s found in the initial audit are fixed and re-verified by live re-runs**: ① arbitrary-path rollback write (P0-1) → path sandboxing (`--allow-root` + extension check + out-of-root rejection); ② missing ratchet monotonicity (P0-2) → partial-order check for tool_policy/rule; an `allow:*` loosening patch padded with increase-safe words is now blocked; ③ P0-regression gate not wired in (P0-3) → `apply` force-runs regression after writeback and auto-rolls-back on failure; ④ whitelist downgrade bypass (P0-4) → canary/injection hits are hard alerts that cannot be downgraded; ⑤ CI always failing (P0-5) → now runs the real `test_p0_regression.py`. Post-fix regression: 18/18 PASS. Remaining P1 (doc contracts, packaging, edge cases) and P2 (dead code, etc.) are mostly non-blocking; veto-variant regexes, honeytoken normalization, and reject-pool fail-closed are also fixed.
 
@@ -143,6 +145,15 @@ Smallest change, fastest payoff. Reasons: finest granularity (each rule independ
 - **A 手动触发 Manual trigger**：用户提供失败轨迹文件 → 调用本 skill → 输出诊断报告 + 补丁建议
 - **B 自动化钩子（推荐）Automated hook (recommended)**：monitor-panel 检测到越权/异常 → 触发本 skill → 诊断+补丁+验证 → 过三闸后写回 → 回报。✅ **已代码化**：`scripts/evolve_trigger.py` 一键跑完整进化环（事件→补丁→diagnosis→评分→judge→[auto-apply]→审计），输出结构化 JSON 供调用方解析；`--auto-apply` 显式传才写回（人工旁路原则），`--dry-run` 只预览，事件支持拦截事件/自由文本/直接 candidate 三形态。**monitor-panel 联动已落地**：`monitor-panel` skill 内置「安全护栏联动」章节（反复自愈失败/越权迹象/安全事件上报 → 按其中命令触发；dry-run 预览 → `--auto-apply` 写回；事件三形态模板齐备）。**接线模板见 `examples/automation_hook.md`**（命令行 / monitor-panel / 定时任务 / 自框架挂载四种形态可直接照抄）。
 - **C 蜜罐联动闭环 Honeypot closed loop**：SkillSentry 测出风险 → 产出对抗样本 → 喂本 skill → 进化环补丁 → 写回 → 回传 SkillSentry 复测 → 通过闭环 / 未过再跑一轮
+
+### 团队 / CI 接入方式 | Team & CI Integration
+
+本 skill 既可单人本地用，也能纳入团队流水线做「护栏协同进化」：
+
+- **CI 门禁 CI gate**：把 `scripts/evolve_trigger.py --auto-apply` 接入护栏变更 PR 的 CI 流程，每次改动自动跑「评分 → 三闸 → 写回 → P0 回归」，失败自动回滚并写审计日志（`--audit-log`），接线模板见 `examples/automation_hook.md` 的「定时任务 / 自框架挂载」形态。
+- **共享情报 Shared intel**：用 `scripts/sync_artifacts.py push` 把已硬化情报导出为**带签名** JSON，`pull` 在团队成员 / 多 Agent 间合入（棘轮只增不减），实现团队级护栏同步进化，杜绝各 Agent 各改各的。
+- **监控联动 Monitoring linkage**：monitor-panel 等监控组件检测到越权 / 异常时，按 `examples/automation_hook.md` 模板触发本 skill；默认 `--dry-run` 预览，确认后再 `--auto-apply` 写回，全程留痕可追溯。
+- **权限原则 Privilege principle**：写回（auto-apply）必须显式传参，禁止静默改线上护栏；任何变更均可经 `rollback` 一键回退到带时间戳快照。
 
 ## 自动化闭环（代码硬支持） | Automated Loop (Code-Supported)
 
@@ -235,6 +246,7 @@ python scripts/evolve_guard.py rollback --backup backups/harness_<时间戳>.jso
 - `references/architecture.md`：完整规格——四工件映射表、进化环伪码、三闸判定表、SkillSentry 冷启动、Rule Bank schema、集成映射总表、局限风险
 - `references/cheatsheet.md`：**一页纸概念图 + 速查卡**（四工件/三道闸/7 步闭环/常用命令/退出码），初次上手先看这张
 - `references/faq.md`：**FAQ 与反模式集中入口**——高频问答 + 「绕过尝试 vs 护栏如何挡」对照表（测评反馈：此前反模式分散在各段，已统一）
+- `CHANGELOG.md`：完整 P1-xx 迭代与审计修复清单（诚实边界中提到的全部 P0/P1 修复细节均在此可查，正文仅保留结论摘要）
 
 ## TL;DR 速查表 | Quick Reference
 
@@ -246,6 +258,25 @@ python scripts/evolve_guard.py rollback --backup backups/harness_<时间戳>.jso
 | 自动化钩子 | monitor-panel 检测到异常 | 自动触发 → 诊断 → 补丁 → 写回 |
 | 出问题回滚 | "回滚" / "撤销写回" | `rollback --backup <快照> --harness <护栏>` |
 | 想快速上手 | "怎么用" / "概念图" | 先读 `references/cheatsheet.md`（一页纸），常见疑问看 `references/faq.md` |
+
+## 常见问题 FAQ | Frequently Asked Questions
+
+下面先答几个最高频的疑问；更全的问答与「绕过尝试 vs 护栏如何挡」对照表见 `references/faq.md`。
+
+**Q1：没有失败样本，进化环转不起来怎么办？**
+用本地样本工厂：`python scripts/gen_coldstart_samples.py --out coldstart_samples`，把内置 attack/benign 基准转成可回放轨迹 + 候选补丁，无需 SkillSentry。详见「冷启动」章节。
+
+**Q2：apply 写回失败，退出码代表什么？**
+`rc=3` 缺有效备份（闸A）→ 先 `backup`；`rc=2` 补丁非法或试图放宽护栏（被棘轮拦）；`rc=6` 写回后 P0 回归未过（已自动回滚）；`rc=4` 路径越界或备份被篡改；`rc=5` 无法加载 score_patch（fail-closed 中止）。完整映射见 `references/cheatsheet.md` 退出码表。
+
+**Q3：怎么保证补丁不会改弱护栏？**
+三道硬闸（先备份 / 安全-效用闸门 / 拒收池去重）+ `apply` 内置强制重跑闸B + 棘轮只增不减偏序校验 + 写回后自动跑 P0 回归闸门，任意一环不通过都不写回。
+
+**Q4：多 Agent / 多人怎么共享同一套护栏？**
+`python scripts/sync_artifacts.py push` 导出带签名情报，`pull` 在团队间合入（棘轮只增不减、`--dry-run` 预览），详见 Resources 中 sync_artifacts 说明。
+
+**Q5：自动化钩子怎么接进我自己的框架？**
+`scripts/evolve_trigger.py` 一键跑完整进化环（事件 → 补丁 → 诊断 → 评分 → judge → [auto-apply] → 审计），输出结构化 JSON 供解析；命令行 / monitor-panel / 定时任务 / 自框架四种接线模板见 `examples/automation_hook.md`。
 
 ## 诊断报告格式模板 | Diagnosis Report Template
 
